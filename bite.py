@@ -893,9 +893,23 @@ def guess_test_command(folder: Path) -> str:
     if dotnet:
         return "dotnet test " + (f'"{dotnet}"' if " " in dotnet else dotnet)
     if any((f / n).exists() for n in ("pytest.ini", "conftest.py", "tox.ini")) or \
-            any(f.glob("test*/test_*.py")) or any(f.glob("test_*.py")) or any(f.glob("*/tests/test_*.py")):
+            any(f.glob("test*/test_*.py")) or any(f.glob("test_*.py")) or any(f.glob("*/tests/test_*.py")) or \
+            _has_pytest_config(f):
         return ("python" if WINDOWS else "python3") + " -m pytest -q"
     return ""
+
+
+def _has_pytest_config(folder: Path) -> bool:
+    """Recognize pytest's config headers without a TOML dependency (Python 3.10)."""
+    for name, header in (("pyproject.toml", r"\[tool\.pytest\.ini_options\][ \t]*(?:#.*)?"),
+                         ("setup.cfg", r"\[tool:pytest\][ \t]*(?:[#;].*)?")):
+        try:
+            lines = (folder / name).read_text(encoding="utf-8-sig").splitlines()
+        except (OSError, UnicodeError):
+            continue
+        if any(re.fullmatch(header, line.strip()) for line in lines):
+            return True
+    return False
 
 
 def jvm_test_command(folder: Path) -> str:
